@@ -16,10 +16,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
 import com.example.roomdatabaseexample.ui.theme.RoomDatabaseExampleTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +38,17 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
 
                     val noteDatabase = NoteDatabase.getDatabase(this@MainActivity)
+                    val dbHelper = DatabaseHelperImpl(noteDatabase)
+                    val roomDBViewModel = RoomDBViewModel(dbHelper)
 
+                    val existingNote = roomDBViewModel.notesResponse.collectAsState().value
+                    existingNote?.let {
+                        existingNote.forEach {
+                                note->
+                            Log.i("AppLogs","${note.id} ${note.title} ${note.content}")
+                        }
+                        Log.i("AppLogs","==============================================")
+                    }
                     Column(modifier = Modifier.fillMaxSize().padding(innerPadding),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -45,7 +57,8 @@ class MainActivity : ComponentActivity() {
                             // Insert a new note
                             CoroutineScope(Dispatchers.IO).launch {
                                 val newNote = Note(title = "My Note $count", content = "This is a sample note $count")
-                                noteDatabase.noteDao().insert(newNote)
+                                roomDBViewModel.insert(newNote)
+                                roomDBViewModel.fetchNotes()
                                 count++
                             }
                         }) {
@@ -61,9 +74,10 @@ class MainActivity : ComponentActivity() {
                                     existingNote.forEach {
                                         note->
                                         note.title = "Updated Note"
-                                        noteDatabase.noteDao().update(note)
+                                        roomDBViewModel.update(note)
                                     }
                                 }
+                                roomDBViewModel.fetchNotes()
                             }
                         }) {
                             Text("Update")
@@ -77,9 +91,10 @@ class MainActivity : ComponentActivity() {
                                 existingNote?.let {
                                     existingNote.forEach {
                                             note->
-                                        noteDatabase.noteDao().delete(note)
+                                        roomDBViewModel.delete(note)
                                     }
                                 }
+                                roomDBViewModel.fetchNotes()
                             }
                         }) {
                             Text("Delete")
@@ -87,23 +102,14 @@ class MainActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
+
+
                         Button(onClick = {
-
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val existingNote = noteDatabase.noteDao().getAllNotes()
-                                existingNote?.let {
-                                    existingNote.forEach {
-                                            note->
-                                        Log.i("AppLogs","${note.id} ${note.title} ${note.content}")
-                                    }
-                                }
-                            }
-
+                            roomDBViewModel.fetchNotes()
                             Log.i("AppLogs","===========================================")
                         }) {
                             Text("Query")
                         }
-
                     }
                 }
             }
